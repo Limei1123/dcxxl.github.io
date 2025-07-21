@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词消消乐</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f7f6f2;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            overflow: hidden;
+        }
+        #title {
+            font-size: 36px;
+            margin: 20px;
+            cursor: pointer;
+            color: #ff6f61;
+        }
+        #menu {
+            margin: 20px;
+        }
+        #time {
+            font-size: 24px;
+            margin: 20px;
+        }
+        #sliderContainer {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        #wordSlider {
+            width: 300px;
+        }
+        #wordCount {
+            font-size: 20px;
+            color: #59c9a5;
+        }
+        #gameButton {
+            font-size: 20px;
+            padding: 10px 20px;
+            background-color: #ff6f61;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #wordPanel {
+            margin: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .wordBlock {
+            width: 100px;
+            height: 50px;
+            margin: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            transition: transform 0.3s, background-color 0.3s;
+            cursor: pointer;
+        }
+        .wordBlock.match {
+            animation: matchAnim 0.5s forwards;
+        }
+        .wordBlock.unmatch {
+            animation: unmatchAnim 0.5s forwards;
+        }
+        @keyframes matchAnim {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        @keyframes unmatchAnim {
+            0%, 100% { background-color: red; }
+            50% { background-color: #ff6f61; }
+        }
+        #modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none;
+        }
+        #modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #59c9a5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">单词消消乐</div>
+    <div id="menu">
+        <div id="sliderContainer">
+            <input type="range" id="wordSlider" min="5" max="50" value="5">
+            <span id="wordCount">5</span> 对单词
+        </div>
+        <button id="gameButton">开始游戏</button>
+    </div>
+    <div id="time">耗时：0秒</div>
+    <div id="wordPanel"></div>
+    <div id="modal">
+        <p>恭喜！全部消除成功，耗时：<span id="finalTime"></span>秒</p>
+        <button id="challengeButton">继续挑战</button>
+    </div>
+
+    <script>
+        const colors = ['#ff6f61', '#59c9a5', '#9088d4', '#ffbc42', '#bb7f3a', '#607196'];
+        
+        // 单词对示例匹配表
+        const wordPairsList = [
+            ["will", "将要"],
+            ["do", "做"],
+            ["can", "能"],
+            ["my", "我的"],
+            ["him", "他"],
+            ["should", "应该"],
+            ["am", "是"],
+            ["this", "这个"],
+            ["herself", "她自己"],
+            ["must", "必须"]
+        ];
+
+        let shuffledWordsList = [];
+        let startTime;
+        let wordPairsCount = 5;
+        let firstWord = null;
+        
+        // 现在假设currentIndex在单词被使用时调整
+        let currentIndex = 0;
+
+        document.getElementById('title').onclick = function() {
+            const newTitle = prompt('请输入新的标题:');
+            if (newTitle) {
+                this.textContent = newTitle;
+            }
+        };
+
+        const wordSlider = document.getElementById('wordSlider');
+        const wordCount = document.getElementById('wordCount');
+        wordSlider.oninput = function() {
+            wordPairsCount = this.value;
+            wordCount.textContent = this.value + ' 对单词';
+        };
+
+        document.getElementById('gameButton').onclick = function() {
+            if (wordPairsList.length === 0) {
+                alert('请上传单词表！');
+            } else {
+                this.textContent = '重新开始（重置词汇）';
+                resetGame();
+                startTime = Date.now();
+            }
+        };
+
+        function resetGame() {
+            shuffledWordsList = shuffleWords(wordPairsList);
+            currentIndex = 0;
+            updateWordPanel();
+        }
+
+        function shuffleWords(wordPairs) {
+            const allWords = wordPairs.flat();
+            return allWords.sort(() => Math.random() - 0.5);
+        }
+
+        function updateWordPanel() {
+            const panel = document.getElementById('wordPanel');
+            panel.innerHTML = '';
+
+            const words = [];
+            for (let i = currentIndex, count = 0; count < wordPairsCount * 2; i += 2, count++) {
+                if (i >= shuffledWordsList.length) {
+                    return;
+                }
+                words.push(shuffledWordsList[i], shuffledWordsList[i + 1]);
+            }
+
+            currentIndex += wordPairsCount * 2;
+
+            words.forEach(word => {
+                const block = document.createElement('div');
+                block.className = 'wordBlock';
+                block.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                block.textContent = word;
+                block.onclick = handleBlockClick;
+                panel.appendChild(block);
+            });
+        }
+
+        function handleBlockClick(event) {
+            const block = event.target;
+            if (block.classList.contains('match')) return;
+
+            if (!firstWord) {
+                firstWord = block;
+                block.style.opacity = '0.7';
+            } else {
+                if (areMatchingPairs(firstWord.textContent, block.textContent)) {
+                    firstWord.classList.add('match');
+                    block.classList.add('match');
+                    firstWord = null;
+                    checkAllMatched();
+                } else {
+                    block.classList.add('unmatch');
+                    firstWord.classList.add('unmatch');
+                    setTimeout(() => {
+                        block.classList.remove('unmatch');
+                        firstWord.classList.remove('unmatch');
+                        firstWord.style.opacity = '1';
+                        firstWord = null;
+                    }, 500);
+                }
+            }
+        }
+
+        function areMatchingPairs(word1, word2) {
+            // 检查两个单词是否为匹配对
+            return wordPairsList.some(pair => {
+                return (pair[0] === word1 && pair[1] === word2) || (pair[0] === word2 && pair[1] === word1);
+            });
+        }
+
+        function checkAllMatched() {
+            const blocks = document.querySelectorAll('.wordBlock');
+            const allMatched = Array.from(blocks).every(block => block.classList.contains('match'));
+            if (allMatched) {
+                const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('finalTime').textContent = elapsedSeconds;
+                document.getElementById('modal').style.display = 'block';
+                startTime = null;
+            }
+        }
+
+        document.getElementById('challengeButton').onclick = function() {
+            document.getElementById('modal').style.display = 'none';
+            updateWordPanel();
+        };
+
+        function updateTimer() {
+            if (startTime) {
+                const currentTime = Date.now();
+                const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                document.getElementById('time').textContent = `耗时：${elapsedSeconds}秒`;
+            }
+            requestAnimationFrame(updateTimer);
+        }
+        updateTimer();
+    </script>
+</body>
+</html>
